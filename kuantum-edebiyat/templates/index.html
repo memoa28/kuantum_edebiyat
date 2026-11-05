@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kuantum Edebiyat Motoru · Çalıkuşu</title>
+<style>
+:root{--bg:#0d1117;--card:#161b22;--line:#30363d;--ink:#e6edf3;--mut:#8b949e;--glow:#58a6ff;--gold:#d4a95a}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:'Segoe UI',system-ui,sans-serif;padding:32px 16px}
+.wrap{max-width:1000px;margin:auto;display:grid;grid-template-columns:1fr 250px;gap:20px}
+@media(max-width:800px){.wrap{grid-template-columns:1fr}}
+h1{grid-column:1/-1;text-align:center;margin:0;font-size:2rem;text-shadow:0 0 12px rgba(88,166,255,.5)}
+.sub{grid-column:1/-1;text-align:center;color:var(--mut);margin:-10px 0 10px}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:28px}
+.badge{display:inline-block;font-size:.8rem;padding:3px 10px;border-radius:99px;border:1px solid var(--line);color:var(--mut);margin-bottom:14px}
+.badge.donum{color:var(--gold);border-color:var(--gold);box-shadow:0 0 10px rgba(212,169,90,.3)}
+#story p{font-family:Georgia,'Times New Roman',serif;font-size:1.18rem;line-height:1.85;margin:0 0 1em;animation:in .7s}
+button{font:inherit;cursor:pointer;border-radius:8px;border:1px solid #384252;background:#1f242c;color:var(--ink);padding:13px 16px;text-align:left;transition:.2s}
+button:hover{background:var(--glow);color:#000}
+#opts{display:flex;flex-direction:column;gap:10px;margin-top:22px}
+.free{display:flex;gap:10px;margin-top:18px}
+input{flex:1;background:#090d13;border:1px solid var(--line);color:#fff;border-radius:8px;padding:12px;font:inherit}
+.start{width:100%;text-align:center;font-weight:bold;color:var(--glow)}
+aside h3{margin:0 0 12px;font-size:.95rem;color:var(--glow)}
+.step{border-left:2px solid var(--glow);padding:0 0 14px 12px;font-size:.85rem}
+.step b{color:var(--ink);font-weight:600}
+.step .ghost{color:#586069;text-decoration:line-through;display:block;margin-top:3px}
+.step .own{color:var(--gold)}
+.hidden{display:none}.err{color:#ff7b72}
+@keyframes in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>📚 Kuantum Edebiyat Motoru</h1>
+  <div class="sub">Çalıkuşu · seçmediğin her yol, gözlemlenmemiş bir evren olarak kalır</div>
+
+  <main class="panel">
+    <div id="intro">
+      <h3>Feride’nin yerine geç</h3>
+      <p style="color:var(--mut)">Hikâye Çalıkuşu’nun ruhuyla, birinci ağızdan yazılır. Kitabın gerçek dönüm noktalarında (✦) verdiğin karar evreni kalıcı olarak değiştirir. İstersen kendi cümleni de yazabilirsin.</p>
+      <button class="start" onclick="ilerle(null)">Evreni Başlat</button>
+    </div>
+    <div id="game" class="hidden">
+      <span id="badge" class="badge"></span>
+      <div id="story"></div>
+      <div id="opts"></div>
+      <div class="free">
+        <input id="own" placeholder="Veya kendi olasılığını yaz…" onkeydown="if(event.key==='Enter')sec(this.value,true)">
+        <button onclick="sec(document.getElementById('own').value,true)">Gönder</button>
+      </div>
+      <button style="margin-top:14px;width:100%;text-align:center" onclick="indir()">📄 Bu evreni tek dosya olarak indir</button>
+    </div>
+  </main>
+
+  <aside class="panel"><h3>Kuantum Çizgisi</h3><div id="path" style="color:var(--mut);font-size:.85rem">Henüz gözlem yapılmadı.</div></aside>
+</div>
+
+<script>
+const S = {adim:0, ozetler:[], son_kesit:"", secenekler:[], hat:[], kesitler:[]};
+const $ = id => document.getElementById(id);
+
+async function ilerle(secim) {
+  S.bekleyen = secim;
+  $('intro').classList.add('hidden'); $('game').classList.remove('hidden');
+  $('opts').innerHTML = ""; $('own').value = "";
+  $('story').innerHTML = "<p style='color:var(--mut)'>Evren dallanıyor…</p>";
+  try {
+    const r = await fetch('/api/ilerle', {method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({adim:S.adim, ozetler:S.ozetler, son_kesit:S.son_kesit, secim})});
+    const rd = r.body.getReader(), dec = new TextDecoder();
+    let buf = "", p = null, metin = "";
+    while (true) {
+      const {done, value} = await rd.read(); if (done) break;
+      buf += dec.decode(value, {stream:true});
+      let n;
+      while ((n = buf.indexOf("\n")) >= 0) {
+        const satir = buf.slice(0, n).trim(); buf = buf.slice(n + 1); if (!satir) continue;
+        const m = JSON.parse(satir);
+        if (m.hata) throw new Error(m.hata);
+        if (m.sifirla) { metin = ""; p = null; $('story').innerHTML = "<p style='color:var(--mut)'>Yedek modelle yeniden deneniyor…</p>"; }
+        if (m.t) {
+          if (!p) { $('story').innerHTML = ""; p = document.createElement('p'); p.style.whiteSpace = 'pre-wrap'; $('story').appendChild(p); }
+          metin += m.t; p.textContent = metin;
+        }
+        if (m.son) {
+          const d = m.son;
+          S.adim = d.adim; S.ozetler.push(d.ozet); S.son_kesit = d.kesit; S.secenekler = d.secenekler;
+          S.kesitler.push({capa:d.capa, donum:d.donum, kesit:d.kesit});
+          ciz(d);
+        }
+      }
+    }
+  } catch (e) {
+    $('story').innerHTML = ""; const p = document.createElement('p'); p.className = 'err';
+    p.textContent = "Bir sorun çıktı: " + e.message; $('story').appendChild(p);
+    const t = document.createElement('button'); t.textContent = '↻ Tekrar dene'; t.onclick = () => ilerle(S.bekleyen); $('story').appendChild(t);
+  }
+}
+
+function ciz(d) {
+  const b = $('badge'); b.textContent = d.donum ? "✦ Dönüm Noktası · " + d.capa : d.capa;
+  b.className = "badge" + (d.donum ? " donum" : "");
+  $('story').innerHTML = "";
+  d.kesit.split(/\n\s*\n/).forEach(t => { const p = document.createElement('p'); p.textContent = t; $('story').appendChild(p); });
+  d.secenekler.forEach(s => { const x = document.createElement('button'); x.textContent = "🔹 " + s; x.onclick = () => sec(s, false); $('opts').appendChild(x); });
+}
+
+function sec(metin, ozgur) {
+  metin = (metin || "").trim(); if (!metin) return;
+  S.hat.push({secilen: metin, ozgur, ghost: ozgur ? S.secenekler : S.secenekler.filter(o => o !== metin)});
+  yol(); ilerle(metin);
+}
+
+function yol() {
+  const k = $('path'); k.innerHTML = "";
+  S.hat.forEach((h, i) => {
+    const d = document.createElement('div'); d.className = 'step';
+    const b = document.createElement('b'); b.textContent = (i + 1) + ". " + h.secilen; if (h.ozgur) b.className = 'own'; d.appendChild(b);
+    h.ghost.forEach(g => { const s = document.createElement('span'); s.className = 'ghost'; s.textContent = g; d.appendChild(s); });
+    k.appendChild(d);
+  });
+}
+
+function indir() {
+  if (!S.kesitler.length) return;
+  const e = t => String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;');
+  let h = '<!DOCTYPE html><html lang="tr"><meta charset="utf-8"><title>Çalıkuşu · Kuantum Evrenim</title><style>body{font-family:Georgia,serif;max-width:720px;margin:40px auto;padding:0 16px;line-height:1.8;color:#222}h2{font:600 .9rem sans-serif;color:#b8860b;margin-top:2em}.c{font:.9rem sans-serif;color:#1f6feb;border-left:3px solid #1f6feb;padding-left:10px}.g{color:#999;text-decoration:line-through;display:block}</style><h1>Çalıkuşu · Kuantum Evrenim</h1>';
+  S.kesitler.forEach((k, i) => {
+    h += '<h2>' + (k.donum ? '✦ Dönüm Noktası · ' : '') + e(k.capa) + '</h2>' + k.kesit.split(/\n\s*\n/).map(p => '<p>' + e(p) + '</p>').join('');
+    const s = S.hat[i];
+    if (s) h += '<div class="c"><b>Seçilen:</b> ' + e(s.secilen) + (s.ozgur ? ' (okuyucunun kendi cümlesi)' : '') + s.ghost.map(g => '<span class="g">' + e(g) + '</span>').join('') + '</div>';
+  });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([h], {type:'text/html'})); a.download = 'kuantum-evrenim.html'; a.click();
+}
+</script>
+</body>
+</html>
